@@ -3251,3 +3251,14 @@ SSL_AUTH_EMAIL_DOMAIN = "MIT.EDU"
 SSL_AUTH_DN_FORMAT_STRING = (
     "/C=US/ST=Massachusetts/O=Massachusetts Institute of Technology/OU=Client CA v1/CN={0}/emailAddress={1}"
 )
+
+OPEN_EDX_FILTERS_CONFIG = {
+    "org.openedx.learning.logistration.context.requested.v1": {
+        "fail_silently": True,
+        "pipeline": ["enterprise.filters.logistration.LogistrationContextEnricher"],
+    },
+    "org.openedx.learning.auth.post_login.redirect_url.requested.v1": {
+        "fail_silently": True,
+        "pipeline": ["enterprise.filters.logistration.PostLoginEnterpriseRedirect"],
+    },
+}

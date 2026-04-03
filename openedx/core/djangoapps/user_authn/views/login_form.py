@@ -13,9 +13,14 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
+from openedx_filters.learning.filters import LogistrationContextRequested
 
 from common.djangoapps import third_party_auth
 from common.djangoapps.edxmako.shortcuts import render_to_response
+from common.djangoapps.student.helpers import get_next_url_for_login_page
+from common.djangoapps.third_party_auth import pipeline
+from common.djangoapps.third_party_auth.decorators import xframe_allow_whitelisted
+from common.djangoapps.util.password_policy_validators import DEFAULT_MAX_PASSWORD_LENGTH
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.user_api import accounts
 from openedx.core.djangoapps.user_api.accounts.utils import (
@@ -23,21 +28,13 @@ from openedx.core.djangoapps.user_api.accounts.utils import (
 )
 from openedx.core.djangoapps.user_api.helpers import FormDescription
 from openedx.core.djangoapps.user_authn.cookies import set_logged_in_cookies
-from openedx.core.djangoapps.user_authn.toggles import should_redirect_to_authn_microfrontend
+from openedx.core.djangoapps.user_authn.toggles import (
+    is_require_third_party_auth_enabled,
+    should_redirect_to_authn_microfrontend,
+)
 from openedx.core.djangoapps.user_authn.views.password_reset import get_password_reset_form
 from openedx.core.djangoapps.user_authn.views.registration_form import RegistrationFormFactory
 from openedx.core.djangoapps.user_authn.views.utils import third_party_auth_context
-from openedx.core.djangoapps.user_authn.toggles import is_require_third_party_auth_enabled
-from openedx.features.enterprise_support.api import enterprise_customer_for_request, enterprise_enabled
-from openedx.features.enterprise_support.utils import (
-    get_enterprise_slug_login_url,
-    handle_enterprise_cookies_for_logistration,
-    update_logistration_context_for_enterprise
-)
-from common.djangoapps.student.helpers import get_next_url_for_login_page
-from common.djangoapps.third_party_auth import pipeline
-from common.djangoapps.third_party_auth.decorators import xframe_allow_whitelisted
-from common.djangoapps.util.password_policy_validators import DEFAULT_MAX_PASSWORD_LENGTH
 
 log = logging.getLogger(__name__)
 
@@ -56,22 +53,8 @@ def _apply_third_party_auth_overrides(request, form_desc):
         running_pipeline = third_party_auth.pipeline.get(request)
         if running_pipeline:
             current_provider = third_party_auth.provider.Registry.get_from_pipeline(running_pipeline)
-            if current_provider and enterprise_customer_for_request(request):
-                pipeline_kwargs = running_pipeline.get('kwargs')
-
-                # Details about the user sent back from the provider.
-                details = pipeline_kwargs.get('details')
-                email = details.get('email', '')
-
-                # override the email field.
-                form_desc.override_field_properties(
-                    "email",
-                    default=email,
-                    restrictions={"readonly": "readonly"} if email else {
-                        "min_length": accounts.EMAIL_MIN_LENGTH,
-                        "max_length": accounts.EMAIL_MAX_LENGTH,
-                    }
-                )
+            if current_provider:
+                pass  # SSO-specific form overrides are handled by filter pipeline steps.
 
 
 def get_login_session_form(request):
@@ -200,12 +183,7 @@ def login_and_registration_form(request, initial_mode="login"):
             running_pipeline.get('backend'), running_pipeline.get('kwargs')
         )
 
-    enterprise_customer = enterprise_customer_for_request(request)
-
-    if should_redirect_to_authn_microfrontend() and \
-            not enterprise_customer and \
-            not tpa_hint_provider and \
-            not saml_provider:
+    if should_redirect_to_authn_microfrontend() and not tpa_hint_provider and not saml_provider:
 
         # This is to handle a case where a logged-in cookie is not present but the user is authenticated.
         # Note: If we don't handle this learner is redirected to authn MFE and then back to dashboard
@@ -260,8 +238,6 @@ def login_and_registration_form(request, initial_mode="login"):
                 'ALLOW_PUBLIC_ACCOUNT_CREATION', settings.FEATURES.get('ALLOW_PUBLIC_ACCOUNT_CREATION', True)),
             'register_links_allowed': settings.FEATURES.get('SHOW_REGISTRATION_LINKS', True),
             'is_account_recovery_feature_enabled': is_secondary_email_feature_enabled(),
-            'enterprise_slug_login_url': get_enterprise_slug_login_url(),
-            'is_enterprise_enable': enterprise_enabled(),
             'is_require_third_party_auth_enabled': is_require_third_party_auth_enabled(),
             'enable_coppa_compliance': settings.ENABLE_COPPA_COMPLIANCE,
             'edx_user_info_cookie_name': settings.EDXMKTG_USER_INFO_COOKIE_NAME,
@@ -277,11 +253,8 @@ def login_and_registration_form(request, initial_mode="login"):
         ),
     }
 
-    update_logistration_context_for_enterprise(request, context, enterprise_customer)
-
+    context, _ = LogistrationContextRequested.run_filter(context=context, request=request)
     response = render_to_response('student_account/login_and_register.html', context)
-    handle_enterprise_cookies_for_logistration(request, response, context)
-
     return response
 
 
