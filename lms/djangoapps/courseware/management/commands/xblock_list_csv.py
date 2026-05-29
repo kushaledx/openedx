@@ -12,8 +12,6 @@ from django.core.management.base import BaseCommand
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from xmodule.modulestore.django import modulestore
 
-
-
 CORE_XBLOCKS = ["html", "problem", "video"]
 
 

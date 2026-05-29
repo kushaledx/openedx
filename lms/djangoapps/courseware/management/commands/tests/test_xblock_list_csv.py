@@ -10,7 +10,6 @@ from django.test import TestCase
 
 from lms.djangoapps.courseware.management.commands.xblock_list_csv import generate_xblocks_csv
 
-
 OVERVIEWS_PATH = "lms.djangoapps.courseware.management.commands.xblock_list_csv.CourseOverview.objects"
 MODULESTORE_PATH = "lms.djangoapps.courseware.management.commands.xblock_list_csv.modulestore"
 
