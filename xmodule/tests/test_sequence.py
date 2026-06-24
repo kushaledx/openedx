@@ -15,6 +15,7 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 from edx_toggles.toggles.testutils import override_waffle_flag
 from freezegun import freeze_time
+from lxml import etree
 from web_fragments.fragment import Fragment
 
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
@@ -24,7 +25,6 @@ from xmodule.tests.helpers import StubUserService
 from xmodule.tests.xml import XModuleXmlImportTest
 from xmodule.tests.xml import factories as xml
 from xmodule.x_module import PUBLIC_VIEW, STUDENT_VIEW
-from lxml import etree
 
 TODAY = now()
 DUE_DATE = TODAY + timedelta(days=7)
