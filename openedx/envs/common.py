@@ -102,6 +102,7 @@ ENV_ROOT = REPO_ROOT.dirname()  # virtualenv dir /edx-platform is in
 COURSES_ROOT = ENV_ROOT / "data"
 XMODULE_ROOT = REPO_ROOT / "xmodule"
 DATA_DIR = COURSES_ROOT
+NODE_MODULES_ROOT = REPO_ROOT / "node_modules"
 
 ############################# Django Built-Ins #############################
 
@@ -2275,7 +2276,7 @@ PIPELINE = {
     # Don't wrap JavaScript as there is code that depends upon updating the global namespace
     'DISABLE_WRAPPER': True,
     # Specify the UglifyJS binary to use
-    'UGLIFYJS_BINARY': 'node_modules/.bin/uglifyjs',
+    'UGLIFYJS_BINARY': Derived(lambda settings: settings.NODE_MODULES_ROOT / ".bin" / "uglifyjs"),
 }
 
 STATICFILES_STORAGE_KWARGS = {}
