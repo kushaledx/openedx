@@ -833,7 +833,7 @@ def course_about(request, course_id):  # pylint: disable=too-many-statements
         show_courseware_link = bool(
             (
                 request.user.has_perm(VIEW_COURSEWARE, course)
-            ) or settings.FEATURES.get('ENABLE_LMS_MIGRATION')
+            ) or settings.ENABLE_LMS_MIGRATION
         )
 
         # If the ecommerce checkout flow is enabled and the mode of the course is
@@ -1706,7 +1706,7 @@ def render_xblock(request, usage_key_string, check_if_enrolled=True, disable_sta
                 'enable_completion_on_view_service': enable_completion_on_view_service,
                 'edx_notes_enabled': is_feature_enabled(course, request.user),
                 'staff_access': staff_access,
-                'xqa_server': settings.FEATURES.get('XQA_SERVER', 'http://your_xqa_server.com'),
+                'xqa_server': getattr(settings, 'XQA_SERVER', 'http://your_xqa_server.com'),
                 'missed_deadlines': missed_deadlines,
                 'missed_gated_content': missed_gated_content,
                 'has_ended': course.has_ended(),

@@ -218,8 +218,8 @@ def instructor_dashboard_2(request, course_id):  # pylint: disable=too-many-stat
         CourseInstructorRole(course_key).has_user(request.user)
     ])
     course_has_special_exams = course.enable_proctored_exams or course.enable_timed_exams
-    can_see_special_exams = course_has_special_exams and user_has_access and settings.FEATURES.get(
-        'ENABLE_SPECIAL_EXAMS', False)
+    can_see_special_exams = course_has_special_exams and user_has_access and getattr(
+        settings, 'ENABLE_SPECIAL_EXAMS', False)
 
     if can_see_special_exams:
         sections.append(_section_special_exams(course, access))
@@ -278,7 +278,7 @@ def instructor_dashboard_2(request, course_id):  # pylint: disable=too-many-stat
         'generate_bulk_certificate_exceptions_url': generate_bulk_certificate_exceptions_url,
         'certificate_exception_view_url': certificate_exception_view_url,
         'certificate_invalidation_view_url': certificate_invalidation_view_url,
-        'xqa_server': settings.FEATURES.get('XQA_SERVER', "http://your_xqa_server.com"),
+        'xqa_server': getattr(settings, 'XQA_SERVER', 'http://your_xqa_server.com'),
     }
 
     context_from_plugins = get_plugins_view_context(
@@ -519,7 +519,7 @@ def _section_course_info(course, access):
 def _section_membership(course, access):
     """ Provide data for the corresponding dashboard section """
     course_key = course.id
-    ccx_enabled = settings.FEATURES.get('CUSTOM_COURSES_EDX', False) and course.enable_ccx
+    ccx_enabled = settings.CUSTOM_COURSES_EDX and course.enable_ccx
 
     section_data = {
         'section_key': 'membership',
@@ -660,7 +660,7 @@ def _section_data_download(course, access):
     course_key = course.id
 
     show_proctored_report_button = (
-        settings.FEATURES.get('ENABLE_SPECIAL_EXAMS', False) and
+        settings.ENABLE_SPECIAL_EXAMS and
         course.enable_proctored_exams
     )
     section_key = 'data_download_2' if data_download_v2_is_enabled() else 'data_download'
