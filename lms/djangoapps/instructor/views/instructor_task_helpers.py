@@ -7,6 +7,7 @@ tasks.
 import json
 import logging
 
+from django.conf import settings
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
@@ -55,7 +56,10 @@ def extract_email_features(email_task):
     try:
         task_input_information = json.loads(email_task.task_input)
     except ValueError:
-        log.error("Could not parse task input as valid json; task input: %s", email_task.task_input)
+        if getattr(settings, 'SQUELCH_PII_IN_LOGS', False):
+            log.error("Could not parse task input as valid json; task input is redacted")
+        else:
+            log.error("Could not parse task input as valid json; task input: %s", email_task.task_input)
         return email_error_information()
 
     email = CourseEmail.objects.get(id=task_input_information['email_id'])
@@ -82,7 +86,10 @@ def extract_email_features(email_task):
         try:
             task_output = json.loads(email_task.task_output)
         except ValueError:
-            log.error("Could not parse task output as valid json; task output: %s", email_task.task_output)
+            if getattr(settings, 'SQUELCH_PII_IN_LOGS', False):
+                log.error("Could not parse task output as valid json; task output is redacted")
+            else:
+                log.error("Could not parse task output as valid json; task output: %s", email_task.task_output)
         else:
             if 'succeeded' in task_output and task_output['succeeded'] > 0:
                 num_emails = task_output['succeeded']
