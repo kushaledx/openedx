@@ -42,27 +42,18 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Get pip cache dir
-        id: pip-cache-dir
-        run: |
-          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache pip dependencies
-        id: cache-dependencies
-        uses: actions/cache@v5
-        with:
-          path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements/edx/development.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install required Python dependencies
         run: |
           # dev-requirements is needed because the linter will otherwise
           # trip over some dev-only things like django-debug-toolbar
-          # (import debug_toolbar) that aren't in testing.txt.
+          # (import debug_toolbar) that aren't in the testing group.
           make dev-requirements
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
           # After all requirements are installed, check that they're consistent with each other
-          pip check
+          uv pip check
 
       - name: Run quality tests
         run: |

@@ -1,18 +1,28 @@
 Requirements/dependencies
 #########################
 
-These directories specify the Python (and system) dependencies for the LMS and Studio.
+The main application's Python dependencies are declared in the root
+``pyproject.toml`` (``[project.dependencies]`` for runtime deps,
+``[dependency-groups]`` for testing/development/doc/assets/semgrep tooling,
+and ``[tool.edx_lint].uv_constraints`` for repo-specific version pins) and
+locked in the root ``uv.lock``, managed with `uv`_.
 
-- ``edx`` contains the normal Python requirements files
-- ``edx-sandbox`` contains the requirements files for Codejail
-- ``constraints.txt`` is shared between the two
+This ``requirements/`` directory now only holds:
 
-(In a normal `OEP-18`_-compliant repository, the ``*.in`` and ``*.txt`` files would be
-directly in the requirements directory.)
+- ``edx-sandbox``, the requirements for Codejail's isolated sandbox environment
+- ``constraints.txt`` / ``common_constraints.txt`` / ``pip-tools.in`` / ``pip-tools.txt``,
+  still needed to ``pip-compile`` ``edx-sandbox`` and the ``scripts/*`` one-off
+  script directories, none of which are on ``uv`` yet
 
-.. _OEP-18: https://github.com/openedx/open-edx-proposals/blob/master/oeps/oep-0018-bp-python-dependencies.rst
+These are being migrated to their own standalone ``uv``-managed projects too,
+tracked in `public-engineering#543`_. Until that's done, they're still
+manipulated using the Makefile targets below in a Linux environment (to match
+our build and deploy systems); for developers on Mac, this can be achieved by
+using the GitHub workflows or by running Make targets from inside devstack's
+lms-shell or another Linux environment.
 
-While the ``*.in`` files are intended to be updated manually, the ``*.txt`` files should only be manipulated using Makefile targets in a Linux environment (to match our build and deploy systems). For developers on Mac, this can be achieved by using the GitHub workflows or by running Make targets from inside devstack's lms-shell or another Linux environment.
+.. _uv: https://docs.astral.sh/uv/
+.. _public-engineering#543: https://github.com/openedx/public-engineering/issues/543
 
 If you don't have write permissions to openedx/edx-platform, you'll need to run these workflows on a fork.
 
@@ -22,7 +32,9 @@ Workflows and Makefile targets
 Add a dependency
 ================
 
-To add a Python dependency, specify it in the appropriate ``requirements/edx/*.in`` file, push that up to a branch, and then use the `compile-python-requirements.yml workflow <https://github.com/openedx/edx-platform/actions/workflows/compile-python-requirements.yml>`_ to run ``make compile-requirements`` against your branch. This will ensure the lockfiles are updated with any transitive dependencies and will ping you on a PR for updating your branch.
+To add a Python dependency, add it to ``[project.dependencies]`` (or the
+appropriate ``[dependency-groups]`` entry) in ``pyproject.toml``, push that up
+to a branch, and then use the `compile-python-requirements.yml workflow <https://github.com/openedx/edx-platform/actions/workflows/compile-python-requirements.yml>`_ to run ``make compile-requirements`` against your branch. This will ensure ``uv.lock`` is updated with any transitive dependencies and will ping you on a PR for updating your branch.
 
 Upgrade just one dependency
 ===========================
@@ -38,10 +50,10 @@ Downgrade a dependency
 
 If you instead need to surgically *downgrade* a dependency:
 
-1. Add an exact-match or max-version constraint to ``constraints.txt`` with a comment explaining why (and ideally a ticket or issue link). Here's what it might look like::
+1. Add an exact-match or max-version constraint to ``[tool.edx_lint].uv_constraints`` in ``pyproject.toml`` with a comment explaining why (and ideally a ticket or issue link). Here's what it might look like::
 
      # frobulator 2.x has breaking API changes; see https://github.com/openedx/edx-platform/issue/1234567 for fixing it
-     frobulator<2.0.0
+     "frobulator<2.0.0",
 
 2. After pushing that up to a branch, use the `compile-python-requirements.yml workflow <https://github.com/openedx/edx-platform/actions/workflows/compile-python-requirements.yml>`_ to run ``make compile-requirements`` against your branch.
 
@@ -78,7 +90,7 @@ Luckily, we have simple runbooks for upgrading or downgrading a single package, 
 Is there an unpinned git dependency?
 ====================================
 
-If the diff relates to a dependency that is installed from git rather than from PyPI (such as being a transitive dependency of anything in github.in), check whether any of the dependencies in github.in has failed to pin a specific commit. We want to have as few of these dependencies as possible, as they're a maintenance and performance problem, and there are important instructions at the top of that file for how to manage them.
+If the diff relates to a dependency that is installed from git rather than from PyPI, check ``[project.dependencies]`` in ``pyproject.toml`` for a direct reference (``name @ git+https://...@TAG-OR-SHA``) that has failed to pin a specific commit. We want to have as few of these dependencies as possible, as they're a maintenance and performance problem.
 
 Help, I didn't change any dependencies, and this is still failing!
 ==================================================================

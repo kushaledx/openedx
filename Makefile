@@ -64,39 +64,30 @@ pull_translations: clean_translations  ## pull translations via atlas
 detect_changed_source_translations: ## check if translation files are up-to-date
 	i18n_tool changed
 
-pre-requirements: ## install Python requirements for running pip-tools
+pre-requirements: ## install Python requirements for running pip-tools (still needed for requirements/edx-sandbox and scripts/*, which aren't on uv yet)
 	pip install -r requirements/pip-tools.txt
 
-local-requirements:
-# 	edx-platform installs some Python projects from within the edx-platform repo itself.
-	pip install -e .
+local-requirements: ## no-op; `uv sync` (used by the targets below) already installs -e . itself
+	@true
 
-dev-requirements: pre-requirements
-	@# The "$(wildcard..)" is to include private.txt if it exists, and make no mention
-	@# of it if it does not.  Shell wildcarding can't do that with default options.
-	pip-sync requirements/edx/development.txt $(wildcard requirements/edx/private.txt)
-	make local-requirements
+dev-requirements: ## install development environment requirements
+	uv sync --group dev --frozen
 
-base-requirements: pre-requirements
-	pip-sync requirements/edx/base.txt
-	make local-requirements
+base-requirements: ## install only production/runtime dependencies
+	uv sync --no-default-groups --frozen
 
-test-requirements: pre-requirements
-	pip-sync --pip-args="--exists-action=w" requirements/edx/testing.txt
-	make local-requirements
+test-requirements: ## install production dependencies plus the testing group (used by CI and tox)
+	uv sync --no-default-groups --group testing --frozen
 
 requirements: dev-requirements ## install development environment requirements
 
-# Order is very important in this list: files must appear after everything they include!
+# requirements/edx-sandbox (codejail's isolated sandbox environment) and the
+# scripts/* one-off script directories are not yet migrated to uv (tracked in
+# https://github.com/openedx/public-engineering/issues/543) and are still
+# compiled with pip-compile below. Order is important: files must appear
+# after everything they include!
 REQ_FILES = \
-	requirements/edx/coverage \
 	requirements/edx-sandbox/base \
-	requirements/edx/base \
-	requirements/edx/doc \
-	requirements/edx/testing \
-	requirements/edx/assets \
-	requirements/edx/development \
-	requirements/edx/semgrep \
 	scripts/xblock/requirements \
 	scripts/user_retirement/requirements/base \
 	scripts/user_retirement/requirements/testing \
@@ -114,10 +105,36 @@ $(COMMON_CONSTRAINTS_TXT):
 	printf "$(COMMON_CONSTRAINTS_TEMP_COMMENT)" | cat - $(@) > temp && mv temp $(@)
 
 compile-requirements: export CUSTOM_COMPILE_COMMAND=make upgrade
-compile-requirements: pre-requirements ## Re-compile *.in requirements to *.txt
-	@# Bootstrapping: Rebuild pip and pip-tools first, and then install them
-	@# so that if there are any failures we'll know now, rather than the next
-	@# time someone tries to use the outputs.
+compile-requirements: pre-requirements ## Regenerate uv.lock for the root project, and re-compile *.in requirements for the not-yet-migrated sub-projects above
+	uv run --no-project --with edx-lint edx_lint write_uv_constraints pyproject.toml
+	uv lock ${UV_LOCK_OPTS}
+
+	@# Compatibility exports for external tooling (e.g. tutor's Dockerfile) that
+	@# still does `pip install -r requirements/edx/<name>.txt` directly. These are
+	@# GENERATED FILES -- see the header comment in each for what regenerates them.
+	@mkdir -p requirements/edx
+	@{ \
+		echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+		echo "# Compatibility export of [project.dependencies] for tools that still"; \
+		echo "# 'pip install -r requirements/edx/base.txt' directly instead of using uv."; \
+		echo "# Source of truth: [project.dependencies] in pyproject.toml / uv.lock."; \
+		uv export --frozen --no-hashes --no-default-groups --no-emit-project; \
+	} > requirements/edx/base.txt
+	@{ \
+		echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+		echo "# Compatibility export of the 'assets' dependency-group for tools that still"; \
+		echo "# 'pip install -r requirements/edx/assets.txt' directly instead of using uv."; \
+		echo "# Source of truth: [dependency-groups].assets in pyproject.toml / uv.lock."; \
+		uv export --frozen --no-hashes --only-group assets --no-emit-project; \
+	} > requirements/edx/assets.txt
+	@{ \
+		echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+		echo "# Compatibility export of the 'dev' dependency-group for tools that still"; \
+		echo "# 'pip install -r requirements/edx/development.txt' directly instead of using uv."; \
+		echo "# Source of truth: [dependency-groups].dev in pyproject.toml / uv.lock."; \
+		uv export --frozen --no-hashes --group dev --no-emit-project; \
+	} > requirements/edx/development.txt
+
 	sed 's/Django<5.0//g' requirements/common_constraints.txt > requirements/common_constraints.tmp
 	mv requirements/common_constraints.tmp requirements/common_constraints.txt
 	sed 's/pip<25.3//g' requirements/common_constraints.txt > requirements/common_constraints.tmp
@@ -135,12 +152,12 @@ compile-requirements: pre-requirements ## Re-compile *.in requirements to *.txt
 		export REBUILD=''; \
 	done
 
-upgrade: $(COMMON_CONSTRAINTS_TXT) ## update the pip requirements files to use the latest releases satisfying our constraints
-	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade"
+upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project, pip-compile for the not-yet-migrated sub-projects) to the latest releases satisfying our constraints
+	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade" UV_LOCK_OPTS="--upgrade"
 
 upgrade-package: ## update just one package to the latest usable release
 	@test -n "$(package)" || { echo "\nUsage: make upgrade-package package=...\n"; exit 1; }
-	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade-package $(package)"
+	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade-package $(package)" UV_LOCK_OPTS="--upgrade-package $(package)"
 
 check-types: ## run static type-checking tests
 	mypy

@@ -41,12 +41,46 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: install system requirements
+        run: |
+          sudo apt-get update && sudo apt-get install libmysqlclient-dev libxmlsec1-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Update any pinned dependencies
         env:
           NEW_VERSION: "${{ inputs.version }}"
           PACKAGE: "${{ inputs.package }}"
         run: |
-          sed 's/^\('$PACKAGE'[^#]*\)==[^ #]\+/\1=='$NEW_VERSION'/' -i requirements/constraints.txt
+          # Constraints now live in [tool.edx_lint].uv_constraints in pyproject.toml
+          # (previously requirements/constraints.txt), so this needs to edit that
+          # TOML array rather than sed-patching a plain-text file. --no-project
+          # avoids syncing the whole project just to edit a TOML file with tomlkit.
+          test -z "$NEW_VERSION" && exit 0
+          uv run --no-project --with tomlkit python3 - <<'PYEOF'
+          import os
+          import re
+
+          import tomlkit
+
+          package = os.environ["PACKAGE"]
+          new_version = os.environ["NEW_VERSION"]
+
+
+          def normalized_name(spec):
+              return re.split(r"[<>=!~\[; ]", spec, maxsplit=1)[0].lower().replace("_", "-")
+
+
+          path = "pyproject.toml"
+          doc = tomlkit.parse(open(path, encoding="utf-8").read())
+          constraints = doc["tool"]["edx_lint"]["uv_constraints"]
+          target = normalized_name(package)
+          for i, spec in enumerate(constraints):
+              if normalized_name(str(spec)) == target and "==" in str(spec):
+                  constraints[i] = re.sub(r"==[^,]+", f"=={new_version}", str(spec))
+          open(path, "w", encoding="utf-8").write(tomlkit.dumps(doc))
+          PYEOF
 
       - name: Run make upgrade-package
         env:

@@ -1,12 +1,19 @@
+# Temporarily disabled: `find_python_dependencies` (from edx-repo-tools) only
+# knows how to scan pip-compile's requirements/edx/{base,testing}.txt for
+# undocumented git-hosted dependencies. Those files were removed when this
+# repo switched to pyproject.toml + uv (see
+# https://github.com/openedx/public-engineering/issues/543). Re-enable once
+# edx-repo-tools can scan pyproject.toml/uv.lock instead — tracked at
+# https://github.com/openedx/repo-tools/issues/725.
 name: Check Python Dependencies
 
 on:
-  pull_request:
-  merge_group:
+  workflow_dispatch:
 
 jobs:
   check_dependencies:
     runs-on: ubuntu-latest
+    if: false
 
     strategy:
       matrix:

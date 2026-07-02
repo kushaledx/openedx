@@ -28,6 +28,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: install system requirements
+        run: |
+          sudo apt-get update && sudo apt-get install libmysqlclient-dev libxmlsec1-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Run make compile-requirements
         env:
           PACKAGE: "${{ inputs.package }}"
@@ -48,7 +55,10 @@ jobs:
         with:
           branch: "${{ github.triggering_actor }}/compile-python-deps"
           branch-suffix: short-commit-hash
-          add-paths: requirements
+          add-paths: |
+            requirements
+            pyproject.toml
+            uv.lock
           commit-message: |
             feat: Recompile Python dependencies
 

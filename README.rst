@@ -99,12 +99,12 @@ Language Packages:
 
 * Backend build:
 
-  - ``pip install -r requirements/edx/assets.txt``
+  - ``uv sync --group assets``
 
 * Backend application:
 
-  - ``pip install -r requirements/edx/base.txt`` (production)
-  - ``pip install -r requirements/edx/development.txt`` (development)
+  - ``uv sync --no-default-groups`` (production)
+  - ``uv sync --group dev`` (development)
 
   Some Python packages have system dependencies. For example, installing these packages on Debian or Ubuntu will require first running ``sudo apt install python3-dev default-libmysqlclient-dev build-essential pkg-config`` to satisfy the requirements of the ``mysqlclient`` Python package.
 

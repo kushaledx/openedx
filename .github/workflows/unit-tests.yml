@@ -91,17 +91,21 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: install requirements
         run: |
           make test-requirements
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
           if [[ "${{ matrix.django-version }}" != "pinned" ]]; then
-            pip install "django~=${{ matrix.django-version }}.0"
-            pip check # fail if this test-reqs/Django combination is broken
+            uv pip install "django~=${{ matrix.django-version }}.0"
+            uv pip check # fail if this test-reqs/Django combination is broken
           fi
 
       - name: list installed package versions
         run: |
-          pip freeze
+          uv pip freeze
 
       - name: set settings path
         shell: bash
@@ -172,9 +176,13 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install libxmlsec1-dev
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: install requirements
         run: |
           make test-requirements
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: collect tests from all modules
         shell: bash
@@ -307,7 +315,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements/edx/coverage.txt
+          pip install coverage diff-cover
 
       - name: Run coverage
         run: |

@@ -83,30 +83,21 @@ jobs:
           sudo apt-get update
           make ubuntu-requirements
 
-      - name: Get pip cache dir
-        id: pip-cache-dir
-        run: |
-          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache pip dependencies
-        id: cache-dependencies
-        uses: actions/cache@v5
-        with:
-          path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements/edx/development.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install Python dependencies
         run: |
           make dev-requirements
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
           if [[ "${{ matrix.django-version }}" != "pinned" ]]; then
-            pip install "django~=${{ matrix.django-version }}.0"
-            pip check # fail if this test-reqs/Django combination is broken
+            uv pip install "django~=${{ matrix.django-version }}.0"
+            uv pip check # fail if this test-reqs/Django combination is broken
           fi
 
       - name: list installed package versions
         run: |
-          sudo pip freeze
+          uv pip freeze
 
       - name: Run Tests
         env:
