@@ -9,17 +9,21 @@ locked in the root ``uv.lock``, managed with `uv`_.
 
 This ``requirements/`` directory now only holds:
 
-- ``edx-sandbox``, the requirements for Codejail's isolated sandbox environment
+- ``edx-sandbox``, its own standalone ``uv``-managed project (``pyproject.toml`` +
+  ``uv.lock``) for Codejail's isolated sandbox environment
 - ``constraints.txt`` / ``common_constraints.txt`` / ``pip-tools.in`` / ``pip-tools.txt``,
-  still needed to ``pip-compile`` ``edx-sandbox`` and the ``scripts/*`` one-off
-  script directories, none of which are on ``uv`` yet
+  now unused leftovers from the pip-compile era, pending removal (tracked in
+  `public-engineering#543`_)
 
-These are being migrated to their own standalone ``uv``-managed projects too,
-tracked in `public-engineering#543`_. Until that's done, they're still
-manipulated using the Makefile targets below in a Linux environment (to match
-our build and deploy systems); for developers on Mac, this can be achieved by
-using the GitHub workflows or by running Make targets from inside devstack's
-lms-shell or another Linux environment.
+The three standalone script directories (``scripts/xblock``,
+``scripts/user_retirement``, ``scripts/structures_pruning``) each have their
+own ``pyproject.toml`` + ``uv.lock`` too, independent of both the main app and
+each other.
+
+All of these are manipulated using the Makefile targets below in a Linux
+environment (to match our build and deploy systems); for developers on Mac,
+this can be achieved by using the GitHub workflows or by running Make targets
+from inside devstack's lms-shell or another Linux environment.
 
 .. _uv: https://docs.astral.sh/uv/
 .. _public-engineering#543: https://github.com/openedx/public-engineering/issues/543

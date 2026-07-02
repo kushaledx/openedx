@@ -122,6 +122,8 @@ jobs:
           branch-suffix: short-commit-hash
           add-paths: |
             requirements
+            scripts/**/pyproject.toml
+            scripts/**/uv.lock
             scripts/**/requirements*
           commit-message: |
             feat: Upgrade Python dependency ${{ inputs.package }}

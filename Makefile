@@ -81,21 +81,14 @@ test-requirements: ## install production dependencies plus the testing group (us
 
 requirements: dev-requirements ## install development environment requirements
 
-# The scripts/* one-off script directories are not yet migrated to uv (tracked
-# in https://github.com/openedx/public-engineering/issues/543) and are still
-# compiled with pip-compile below. Order is important: files must appear
-# after everything they include!
-REQ_FILES = \
-	scripts/xblock/requirements \
-	scripts/user_retirement/requirements/base \
-	scripts/user_retirement/requirements/testing \
-	scripts/structures_pruning/requirements/base \
-	scripts/structures_pruning/requirements/testing
-
 # uv-managed sub-projects, each with their own pyproject.toml + uv.lock,
-# independent of the root project's dependency graph.
-UV_SUBPROJECTS = \
-	requirements/edx-sandbox
+# independent of the root project's dependency graph:
+#   requirements/edx-sandbox, scripts/xblock, scripts/user_retirement,
+#   scripts/structures_pruning
+# Their compatibility .txt exports (for anyone still installing via plain
+# pip) don't follow a uniform naming/grouping scheme, so each is handled
+# explicitly in compile-requirements below rather than through one generic
+# loop over a shared list.
 
 define COMMON_CONSTRAINTS_TEMP_COMMENT
 # This is a temporary solution to override the real common_constraints.txt\n# In edx-lint, until the pyjwt constraint in edx-lint has been removed.\n# See BOM-2721 for more details.\n# Below is the copied and edited version of common_constraints\n
@@ -143,33 +136,51 @@ compile-requirements: pre-requirements ## Regenerate uv.lock for the root projec
 	sed 's/pip<25.3//g' requirements/common_constraints.txt > requirements/common_constraints.tmp
 	mv requirements/common_constraints.tmp requirements/common_constraints.txt
 
-	pip-compile -v --allow-unsafe ${COMPILE_OPTS} -o requirements/pip-tools.txt requirements/pip-tools.in
-	pip install -r requirements/pip-tools.txt
-
-	@ export REBUILD='--rebuild'; \
-	for f in $(REQ_FILES); do \
-		echo ; \
-		echo "== $$f ===============================" ; \
-		echo "pip-compile -v $$REBUILD ${COMPILE_OPTS} -o $$f.txt $$f.in"; \
-		pip-compile -v $$REBUILD ${COMPILE_OPTS} -o $$f.txt $$f.in || exit 1; \
-		export REBUILD=''; \
-	done
-
-	@for d in $(UV_SUBPROJECTS); do \
+	@# requirements/edx-sandbox and scripts/xblock: single compat export, no dependency-groups.
+	@for d in requirements/edx-sandbox scripts/xblock; do \
 		echo ; \
 		echo "== $$d ===============================" ; \
 		uv run --no-project --with edx-lint edx_lint write_uv_constraints $$d/pyproject.toml && \
-		(cd $$d && uv lock ${UV_LOCK_OPTS}) && \
-		( \
-			echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
-			echo "# Compatibility export for anyone still 'pip install -r $$d/base.txt'"; \
-			echo "# directly instead of using uv. Source of truth: $$d/pyproject.toml / uv.lock."; \
-			(cd $$d && uv export --frozen --no-hashes --no-emit-project); \
-		) > $$d/base.txt \
+		(cd $$d && uv lock ${UV_LOCK_OPTS}) \
 		|| exit 1; \
 	done
+	@{ \
+		echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+		echo "# Compatibility export for anyone still 'pip install -r requirements/edx-sandbox/base.txt'"; \
+		echo "# directly instead of using uv. Source of truth: requirements/edx-sandbox/pyproject.toml / uv.lock."; \
+		(cd requirements/edx-sandbox && uv export --frozen --no-hashes --no-emit-project); \
+	} > requirements/edx-sandbox/base.txt
+	@{ \
+		echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+		echo "# Compatibility export for anyone still 'pip install -r scripts/xblock/requirements.txt'"; \
+		echo "# directly instead of using uv. Source of truth: scripts/xblock/pyproject.toml / uv.lock."; \
+		(cd scripts/xblock && uv export --frozen --no-hashes --no-emit-project); \
+	} > scripts/xblock/requirements.txt
 
-upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project and uv sub-projects, pip-compile for the not-yet-migrated sub-projects) to the latest releases satisfying our constraints
+	@# scripts/user_retirement and scripts/structures_pruning: base + testing (test group) compat exports.
+	@for d in scripts/user_retirement scripts/structures_pruning; do \
+		echo ; \
+		echo "== $$d ===============================" ; \
+		uv run --no-project --with edx-lint edx_lint write_uv_constraints $$d/pyproject.toml && \
+		(cd $$d && uv lock ${UV_LOCK_OPTS}) \
+		|| exit 1; \
+	done
+	@for d in scripts/user_retirement scripts/structures_pruning; do \
+		{ \
+			echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+			echo "# Compatibility export for anyone still 'pip install -r $$d/requirements/base.txt'"; \
+			echo "# directly instead of using uv. Source of truth: $$d/pyproject.toml / uv.lock."; \
+			(cd $$d && uv export --frozen --no-hashes --no-emit-project); \
+		} > $$d/requirements/base.txt; \
+		{ \
+			echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+			echo "# Compatibility export for anyone still 'pip install -r $$d/requirements/testing.txt'"; \
+			echo "# directly instead of using uv. Source of truth: $$d/pyproject.toml (test group) / uv.lock."; \
+			(cd $$d && uv export --frozen --no-hashes --group test --no-emit-project); \
+		} > $$d/requirements/testing.txt; \
+	done
+
+upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project and all uv sub-projects) to the latest releases satisfying our constraints
 	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade" UV_LOCK_OPTS="--upgrade"
 
 upgrade-package: ## update just one package to the latest usable release
