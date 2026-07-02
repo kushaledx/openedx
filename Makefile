@@ -64,7 +64,7 @@ pull_translations: clean_translations  ## pull translations via atlas
 detect_changed_source_translations: ## check if translation files are up-to-date
 	i18n_tool changed
 
-pre-requirements: ## install Python requirements for running pip-tools (still needed for requirements/edx-sandbox and scripts/*, which aren't on uv yet)
+pre-requirements: ## install Python requirements for running pip-tools (still needed for scripts/*, which aren't on uv yet)
 	pip install -r requirements/pip-tools.txt
 
 local-requirements: ## no-op; `uv sync` (used by the targets below) already installs -e . itself
@@ -81,18 +81,21 @@ test-requirements: ## install production dependencies plus the testing group (us
 
 requirements: dev-requirements ## install development environment requirements
 
-# requirements/edx-sandbox (codejail's isolated sandbox environment) and the
-# scripts/* one-off script directories are not yet migrated to uv (tracked in
-# https://github.com/openedx/public-engineering/issues/543) and are still
+# The scripts/* one-off script directories are not yet migrated to uv (tracked
+# in https://github.com/openedx/public-engineering/issues/543) and are still
 # compiled with pip-compile below. Order is important: files must appear
 # after everything they include!
 REQ_FILES = \
-	requirements/edx-sandbox/base \
 	scripts/xblock/requirements \
 	scripts/user_retirement/requirements/base \
 	scripts/user_retirement/requirements/testing \
 	scripts/structures_pruning/requirements/base \
 	scripts/structures_pruning/requirements/testing
+
+# uv-managed sub-projects, each with their own pyproject.toml + uv.lock,
+# independent of the root project's dependency graph.
+UV_SUBPROJECTS = \
+	requirements/edx-sandbox
 
 define COMMON_CONSTRAINTS_TEMP_COMMENT
 # This is a temporary solution to override the real common_constraints.txt\n# In edx-lint, until the pyjwt constraint in edx-lint has been removed.\n# See BOM-2721 for more details.\n# Below is the copied and edited version of common_constraints\n
@@ -152,7 +155,21 @@ compile-requirements: pre-requirements ## Regenerate uv.lock for the root projec
 		export REBUILD=''; \
 	done
 
-upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project, pip-compile for the not-yet-migrated sub-projects) to the latest releases satisfying our constraints
+	@for d in $(UV_SUBPROJECTS); do \
+		echo ; \
+		echo "== $$d ===============================" ; \
+		uv run --no-project --with edx-lint edx_lint write_uv_constraints $$d/pyproject.toml && \
+		(cd $$d && uv lock ${UV_LOCK_OPTS}) && \
+		( \
+			echo "# GENERATED FILE, DO NOT EDIT DIRECTLY."; \
+			echo "# Compatibility export for anyone still 'pip install -r $$d/base.txt'"; \
+			echo "# directly instead of using uv. Source of truth: $$d/pyproject.toml / uv.lock."; \
+			(cd $$d && uv export --frozen --no-hashes --no-emit-project); \
+		) > $$d/base.txt \
+		|| exit 1; \
+	done
+
+upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project and uv sub-projects, pip-compile for the not-yet-migrated sub-projects) to the latest releases satisfying our constraints
 	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade" UV_LOCK_OPTS="--upgrade"
 
 upgrade-package: ## update just one package to the latest usable release
