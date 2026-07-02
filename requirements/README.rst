@@ -7,18 +7,15 @@ The main application's Python dependencies are declared in the root
 and ``[tool.edx_lint].uv_constraints`` for repo-specific version pins) and
 locked in the root ``uv.lock``, managed with `uv`_.
 
-This ``requirements/`` directory now only holds:
+This ``requirements/`` directory now only holds ``edx-sandbox``, its own
+standalone ``uv``-managed project (``pyproject.toml`` + ``uv.lock``) for
+Codejail's isolated sandbox environment.
 
-- ``edx-sandbox``, its own standalone ``uv``-managed project (``pyproject.toml`` +
-  ``uv.lock``) for Codejail's isolated sandbox environment
-- ``constraints.txt`` / ``common_constraints.txt`` / ``pip-tools.in`` / ``pip-tools.txt``,
-  now unused leftovers from the pip-compile era, pending removal (tracked in
-  `public-engineering#543`_)
-
-The three standalone script directories (``scripts/xblock``,
+The three standalone script directories at the repo root (``scripts/xblock``,
 ``scripts/user_retirement``, ``scripts/structures_pruning``) each have their
 own ``pyproject.toml`` + ``uv.lock`` too, independent of both the main app and
-each other.
+each other. This completes the migration from pip-compile tracked in
+`public-engineering#543`_.
 
 All of these are manipulated using the Makefile targets below in a Linux
 environment (to match our build and deploy systems); for developers on Mac,
@@ -47,7 +44,7 @@ Want to upgrade just *one* dependency without pulling in other upgrades? You can
 
 Or, if you need to do it locally, you can use the ``upgrade-package`` make target directly. For example, you could run ``make upgrade-package package=ecommerce``.
 
-If your dependency is pinned in constraints.txt, you'll need to enter an explicit version number in the appropriate field when running the workflow; this will include an update to the constraint file in the resulting PR.
+If your dependency is pinned in ``[tool.edx_lint].uv_constraints`` (in ``pyproject.toml``), you'll need to enter an explicit version number in the appropriate field when running the workflow; this will include an update to that constraint in the resulting PR.
 
 Downgrade a dependency
 ======================

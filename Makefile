@@ -3,7 +3,7 @@
   compile-requirements detect_changed_source_translations dev-requirements \
   docs extract_translations \
   guides help lint-imports local-requirements migrate migrate-lms migrate-cms \
-  pre-requirements pull pull_xblock_translations pull_translations push_translations \
+  pull pull_xblock_translations pull_translations push_translations \
   requirements shell swagger \
   technical-docs test-requirements ubuntu-requirements upgrade-package upgrade
 
@@ -64,9 +64,6 @@ pull_translations: clean_translations  ## pull translations via atlas
 detect_changed_source_translations: ## check if translation files are up-to-date
 	i18n_tool changed
 
-pre-requirements: ## install Python requirements for running pip-tools (still needed for scripts/*, which aren't on uv yet)
-	pip install -r requirements/pip-tools.txt
-
 local-requirements: ## no-op; `uv sync` (used by the targets below) already installs -e . itself
 	@true
 
@@ -90,18 +87,7 @@ requirements: dev-requirements ## install development environment requirements
 # explicitly in compile-requirements below rather than through one generic
 # loop over a shared list.
 
-define COMMON_CONSTRAINTS_TEMP_COMMENT
-# This is a temporary solution to override the real common_constraints.txt\n# In edx-lint, until the pyjwt constraint in edx-lint has been removed.\n# See BOM-2721 for more details.\n# Below is the copied and edited version of common_constraints\n
-endef
-
-COMMON_CONSTRAINTS_TXT=requirements/common_constraints.txt
-.PHONY: $(COMMON_CONSTRAINTS_TXT)
-$(COMMON_CONSTRAINTS_TXT):
-	curl -L https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt > "$(@)"
-	printf "$(COMMON_CONSTRAINTS_TEMP_COMMENT)" | cat - $(@) > temp && mv temp $(@)
-
-compile-requirements: export CUSTOM_COMPILE_COMMAND=make upgrade
-compile-requirements: pre-requirements ## Regenerate uv.lock for the root project, and re-compile *.in requirements for the not-yet-migrated sub-projects above
+compile-requirements: ## Regenerate uv.lock for the root project and all uv sub-projects
 	uv run --no-project --with edx-lint edx_lint write_uv_constraints pyproject.toml
 	uv lock ${UV_LOCK_OPTS}
 
@@ -130,11 +116,6 @@ compile-requirements: pre-requirements ## Regenerate uv.lock for the root projec
 		echo "# Source of truth: [dependency-groups].dev in pyproject.toml / uv.lock."; \
 		uv export --frozen --no-hashes --group dev --no-emit-project; \
 	} > requirements/edx/development.txt
-
-	sed 's/Django<5.0//g' requirements/common_constraints.txt > requirements/common_constraints.tmp
-	mv requirements/common_constraints.tmp requirements/common_constraints.txt
-	sed 's/pip<25.3//g' requirements/common_constraints.txt > requirements/common_constraints.tmp
-	mv requirements/common_constraints.tmp requirements/common_constraints.txt
 
 	@# requirements/edx-sandbox and scripts/xblock: single compat export, no dependency-groups.
 	@for d in requirements/edx-sandbox scripts/xblock; do \
@@ -180,12 +161,12 @@ compile-requirements: pre-requirements ## Regenerate uv.lock for the root projec
 		} > $$d/requirements/testing.txt; \
 	done
 
-upgrade: $(COMMON_CONSTRAINTS_TXT) ## update all dependencies (uv.lock for the root project and all uv sub-projects) to the latest releases satisfying our constraints
-	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade" UV_LOCK_OPTS="--upgrade"
+upgrade: ## update all dependencies (uv.lock for the root project and all uv sub-projects) to the latest releases satisfying our constraints
+	$(MAKE) compile-requirements UV_LOCK_OPTS="--upgrade"
 
 upgrade-package: ## update just one package to the latest usable release
 	@test -n "$(package)" || { echo "\nUsage: make upgrade-package package=...\n"; exit 1; }
-	$(MAKE) compile-requirements COMPILE_OPTS="--upgrade-package $(package)" UV_LOCK_OPTS="--upgrade-package $(package)"
+	$(MAKE) compile-requirements UV_LOCK_OPTS="--upgrade-package $(package)"
 
 check-types: ## run static type-checking tests
 	mypy
