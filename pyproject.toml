@@ -21,6 +21,12 @@ development = { file = ["requirements/edx/development.txt"] }
 testing = { file = ["requirements/edx/testing.txt"] }
 doc = { file = ["requirements/edx/doc.txt"] }
 
+[project.scripts]
+# Build the legacy frontends in the install location, so a
+# downstream project can build assets without assuming a sibling checkout.
+openedx_legacy_webpack = "openedx.scripts.run_webpack:main"
+openedx_legacy_sass = "openedx.scripts.compile_sass:main"
+
 [tool.setuptools.package-data]
 xmodule = ["js/module/*"]
 

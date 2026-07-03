@@ -274,7 +274,7 @@ def main(
             click.echo(f"      Source: {source_css_file}")
             click.echo(f"      Target: {target_css_file}")
             if not dry:
-                subprocess.run(["rtlcss", source_css_file, target_css_file])
+                subprocess.run(["./node_modules/.bin/rtlcss", source_css_file, target_css_file])
             click.secho("      Generated.", fg="green")
 
     # Information
@@ -312,12 +312,13 @@ def main(
             if (theme_dir / theme / "lms").is_dir() or (theme_dir / theme / "cms").is_dir()
         ]
 
-    # We expect this script to be run from the edx-platform root.
-    repo = Path(".")
+    # We need to run from the repo root.
+    repo = Path(__file__).parent.parent.parent
     if not (repo / "xmodule").is_dir():
-        # Sanity check: If the xmodule/ folder is missing, we're definitely not at the root
-        # of edx-platform, so save the user some headache by exiting early.
-        raise Exception(f"{__file__} must be run from the root of edx-platform")
+        # Sanity check: If the xmodule/ folder is missing, we're definitely haven't found the
+        # root of edx-platform, so save the user some headache by exiting early.
+        raise Exception(f"{__file__} could not find the openedx-platform repository root")
+    os.chdir(repo)
 
     # Every Sass compilation will use have these directories as lookup paths,
     # regardless of theme.
