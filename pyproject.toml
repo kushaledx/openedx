@@ -1,15 +1,31 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools<82"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "openedx-platform"
-version = "0.13"
+version = "0.14"
 requires-python = ">=3.12"
-dependencies = ["setuptools"]
+dynamic = ["dependencies", "optional-dependencies"]
 
-[tool.setuptools]
-packages = ["cms", "common", "lms", "openedx", "xmodule"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cms*", "common*", "lms*", "openedx*", "xmodule*"]
+exclude = ["*.tests", "*.tests.*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements/edx/base.txt"] }
+
+[tool.setuptools.dynamic.optional-dependencies]
+development = { file = ["requirements/edx/development.txt"] }
+testing = { file = ["requirements/edx/testing.txt"] }
+doc = { file = ["requirements/edx/doc.txt"] }
+
+[project.scripts]
+# Build the legacy frontends in the install location, so a
+# downstream project can build assets without assuming a sibling checkout.
+openedx_legacy_webpack = "openedx.scripts.run_webpack:main"
+openedx_legacy_sass = "openedx.scripts.compile_sass:main"
 
 [tool.setuptools.package-data]
 xmodule = ["js/module/*"]
